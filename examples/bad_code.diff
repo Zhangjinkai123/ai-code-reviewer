@@ -1,0 +1,21 @@
+diff --git a/UserService.java b/UserService.java
+index 1111111..2222222 100644
+--- a/UserService.java
++++ b/UserService.java
+@@ -15,12 +15,25 @@ public class UserService {
+
+ public class UserService {
+
+     private JdbcTemplate jdbc;
+
+
++    public User getUser(String id){
++
++        String sql =
++        "select * from user where id="
++        + id;
++
++        return jdbc.query(sql);
++
++    }
+ }

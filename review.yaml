@@ -1,0 +1,3 @@
+review:
+  # 达到或超过该严重程度的问题将导致审查失败 (low / medium / high / critical)
+  severity_threshold: high
