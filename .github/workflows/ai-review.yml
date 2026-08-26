@@ -1,0 +1,76 @@
+name: AI Code Review
+
+
+on:
+
+  pull_request:
+
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+
+
+jobs:
+
+
+  review:
+
+
+    runs-on: ubuntu-latest
+
+
+
+    steps:
+
+
+      -
+        name: Checkout code
+
+        uses: actions/checkout@v4
+
+        with:
+
+          fetch-depth: 0
+
+
+
+      -
+        name: Setup Python
+
+        uses: actions/setup-python@v5
+
+        with:
+
+          python-version: "3.11"
+
+
+
+      -
+        name: Install dependencies
+
+        run: |
+
+          pip install -r requirements.txt
+
+
+
+      -
+        name: Run AI Review
+
+        env:
+
+          OPENAI_API_KEY:
+            ${{ secrets.CR_API_KEY }}
+
+          OPENAI_BASE_URL:
+            ${{ secrets.CR_BASE_URL }}
+
+          OPENAI_MODEL:
+            ${{ secrets.CR_MODEL }}
+
+
+        run:
+
+          python main.py review
