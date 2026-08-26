@@ -69,6 +69,9 @@ jobs:
 
           LLM_MODEL:
             ${{ secrets.CR_MODEL }}
+            
+          GITHUB_BASE_SHA:
+            ${{ github.event.pull_request.base.sha }}
 
 
         run:

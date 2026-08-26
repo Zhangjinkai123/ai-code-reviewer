@@ -1,14 +1,41 @@
+import os
 import subprocess
 
 
+
 def get_git_diff():
-    result = subprocess.run(
-        ["git", "diff"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace"
+
+    base_sha = os.getenv(
+        "GITHUB_BASE_SHA"
     )
+
+
+    if base_sha:
+
+        cmd = [
+            "git",
+            "diff",
+            base_sha,
+            "HEAD"
+        ]
+
+
+    else:
+
+        cmd = [
+            "git",
+            "diff",
+            "origin/main..."
+        ]
+
+
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True
+    )
+
 
     if result.returncode != 0:
 
