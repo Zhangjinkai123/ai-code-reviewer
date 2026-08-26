@@ -1,5 +1,8 @@
 public class HelloWorld {
     public static void main(String[] args) {
+        String sql =
+            "select * from user where id="
+            + id;
         System.out.println("Hello World!");
     }
 }
