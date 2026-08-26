@@ -67,7 +67,7 @@ jobs:
           OPENAI_BASE_URL:
             ${{ secrets.CR_BASE_URL }}
 
-          OPENAI_MODEL:
+          LLM_MODEL:
             ${{ secrets.CR_MODEL }}
 
 
