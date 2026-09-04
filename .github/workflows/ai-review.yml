@@ -11,6 +11,12 @@ on:
       - reopened
 
 
+permissions:
+
+  contents: read
+
+  pull-requests: write
+
 
 jobs:
 
@@ -19,7 +25,6 @@ jobs:
 
 
     runs-on: ubuntu-latest
-
 
 
     steps:
@@ -35,7 +40,6 @@ jobs:
           fetch-depth: 0
 
 
-
       -
         name: Setup Python
 
@@ -46,7 +50,6 @@ jobs:
           python-version: "3.11"
 
 
-
       -
         name: Install dependencies
 
@@ -55,9 +58,8 @@ jobs:
           pip install -r requirements.txt
 
 
-
       -
-        name: Run AI Review
+        name: Run AI Review and Comment
 
         env:
 
@@ -69,11 +71,16 @@ jobs:
 
           LLM_MODEL:
             ${{ secrets.CR_MODEL }}
-            
+
           GITHUB_BASE_SHA:
             ${{ github.event.pull_request.base.sha }}
 
+          GITHUB_TOKEN:
+            ${{ secrets.GITHUB_TOKEN }}
 
-        run:
 
-          python main.py review
+        run: |
+
+          python main.py pr-comment \
+            "${{ github.repository }}" \
+            "${{ github.event.pull_request.number }}"
