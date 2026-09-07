@@ -4,6 +4,7 @@ public class HelloWorld {
         String sql =
             "select * from user where id="
             + ids;
+            System.out.println(sql);
         System.out.println("Hello World!");
     }
 }
