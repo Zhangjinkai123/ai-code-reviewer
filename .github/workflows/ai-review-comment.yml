@@ -1,43 +1,26 @@
 name: AI Code Review Comment
 
-
 on:
-
   workflow_run:
-
     workflows:
       - AI Code Review
-
     types:
       - completed
 
-
 permissions:
-
   contents: read
-
   issues: write
-
   pull-requests: write
 
-
 jobs:
-
-
   comment:
-
-
     runs-on: ubuntu-latest
-
 
     steps:
 
-
-      -
-        name: Show workflow result
+      - name: Show workflow result
 
         run: |
-
           echo "Workflow:"
           echo "${{ github.event.workflow_run.name }}"
 
@@ -47,32 +30,21 @@ jobs:
           echo "Run ID:"
           echo "${{ github.event.workflow_run.id }}"
 
-
-      -
-        name: Download Review Result
+      - name: Download Review Result
 
         uses: actions/download-artifact@v4
 
         with:
-
           name: ai-review-result
-
           path: review-result
-
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
           run-id: ${{ github.event.workflow_run.id }}
 
-
-      -
-        name: Show Review Result
+      - name: Show Review Result
 
         run: |
-
           echo "=============================="
-
           echo "AI Review Result"
-
           echo "=============================="
 
           cat review-result/review-report.json
