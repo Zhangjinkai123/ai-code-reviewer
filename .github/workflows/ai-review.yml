@@ -15,8 +15,6 @@ permissions:
 
   contents: read
 
-  pull-requests: write
-
 
 jobs:
 
@@ -59,7 +57,7 @@ jobs:
 
 
       -
-        name: Run AI Review and Comment
+        name: Run AI Review
 
         env:
 
@@ -75,12 +73,7 @@ jobs:
           GITHUB_BASE_SHA:
             ${{ github.event.pull_request.base.sha }}
 
-          GITHUB_TOKEN:
-            ${{ secrets.GITHUB_TOKEN }}
-
 
         run: |
 
-          python main.py pr-comment \
-            "${{ github.repository }}" \
-            "${{ github.event.pull_request.number }}"
+          python main.py review

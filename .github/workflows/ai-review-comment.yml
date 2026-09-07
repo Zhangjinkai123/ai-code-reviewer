@@ -1,0 +1,48 @@
+name: AI Code Review Comment
+
+
+on:
+
+  workflow_run:
+
+    workflows:
+      - AI Code Review
+
+    types:
+      - completed
+
+
+permissions:
+
+  contents: read
+
+  issues: write
+
+  pull-requests: write
+
+
+jobs:
+
+
+  comment:
+
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+
+      -
+        name: Show workflow result
+
+        run: |
+
+          echo "Workflow:"
+          echo "${{ github.event.workflow_run.name }}"
+
+          echo "Conclusion:"
+          echo "${{ github.event.workflow_run.conclusion }}"
+
+          echo "Run ID:"
+          echo "${{ github.event.workflow_run.id }}"
