@@ -71,15 +71,24 @@ jobs:
       # -------------------------------------------------
       # 4. 查看 Review Result
       # -------------------------------------------------
-
       - name: Show Review Result
         run: |
           echo "=============================="
-          echo "AI Review Result"
+          echo "Downloaded files"
           echo "=============================="
 
-          cat review-result/review-report.json
+          if [ -d "review-result" ]; then
+            find review-result -maxdepth 3 -type f -print
+          else
+            echo "review-result directory does not exist."
+          fi
 
+          echo ""
+          echo "=============================="
+          echo "Directory tree"
+          echo "=============================="
+
+          find . -maxdepth 3 -type f | sort
 
       # -------------------------------------------------
       # 5. Checkout 默认分支代码
