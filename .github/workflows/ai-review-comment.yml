@@ -56,7 +56,42 @@ jobs:
 
 
       # -------------------------------------------------
-      # 3. 下载上游 AI Review Artifact
+      # 3. Checkout 默认分支的可信代码
+      #
+      # 注意：
+      # 这里不能 checkout PR 的代码。
+      # workflow_run 是高权限 workflow，
+      # 只使用默认分支上的可信代码。
+      # -------------------------------------------------
+
+      - name: Checkout trusted repository code
+        uses: actions/checkout@v4
+
+
+      # -------------------------------------------------
+      # 4. Setup Python
+      # -------------------------------------------------
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # -------------------------------------------------
+      # 5. 安装依赖
+      # -------------------------------------------------
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+
+      # -------------------------------------------------
+      # 6. 下载上游 AI Review Artifact
+      #
+      # 必须放在 checkout 后面。
+      # 否则 checkout 可能清理已经下载的 artifact。
       # -------------------------------------------------
 
       - name: Download Review Result
@@ -69,58 +104,16 @@ jobs:
 
 
       # -------------------------------------------------
-      # 4. 查看 Review Result
+      # 7. 查看 Review Result
       # -------------------------------------------------
+
       - name: Show Review Result
         run: |
           echo "=============================="
-          echo "Downloaded files"
+          echo "AI Review Result"
           echo "=============================="
 
-          if [ -d "review-result" ]; then
-            find review-result -maxdepth 3 -type f -print
-          else
-            echo "review-result directory does not exist."
-          fi
-
-          echo ""
-          echo "=============================="
-          echo "Directory tree"
-          echo "=============================="
-
-          find . -maxdepth 3 -type f | sort
-
-      # -------------------------------------------------
-      # 5. Checkout 默认分支代码
-      #
-      # 注意：
-      # 这里故意不 checkout PR。
-      #
-      # workflow_run 是高权限 workflow，
-      # 只能使用可信任的默认分支代码。
-      # -------------------------------------------------
-
-      - name: Checkout trusted repository code
-        uses: actions/checkout@v4
-
-
-      # -------------------------------------------------
-      # 6. Setup Python
-      # -------------------------------------------------
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-
-      # -------------------------------------------------
-      # 7. 安装依赖
-      # -------------------------------------------------
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+          cat review-result/review-report.json
 
 
       # -------------------------------------------------
