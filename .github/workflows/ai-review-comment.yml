@@ -14,12 +14,17 @@ permissions:
 
 jobs:
   comment:
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
+
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Show workflow result
+      # -------------------------------------------------
+      # 1. 显示上游 AI Review 信息
+      # -------------------------------------------------
 
+      - name: Show workflow result
         run: |
           echo "Workflow:"
           echo "${{ github.event.workflow_run.name }}"
@@ -30,21 +35,154 @@ jobs:
           echo "Run ID:"
           echo "${{ github.event.workflow_run.id }}"
 
+          echo "Pull Requests:"
+          echo '${{ toJSON(github.event.workflow_run.pull_requests) }}'
+
+
+      # -------------------------------------------------
+      # 2. 获取 PR Number
+      # -------------------------------------------------
+
+      - name: Check Pull Request
+        env:
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          echo "PR_NUMBER=${PR_NUMBER}"
+
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "No Pull Request associated with this workflow run."
+            exit 1
+          fi
+
+
+      # -------------------------------------------------
+      # 3. 下载上游 AI Review Artifact
+      # -------------------------------------------------
+
       - name: Download Review Result
-
         uses: actions/download-artifact@v4
-
         with:
           name: ai-review-result
           path: review-result
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
-      - name: Show Review Result
 
+      # -------------------------------------------------
+      # 4. 查看 Review Result
+      # -------------------------------------------------
+
+      - name: Show Review Result
         run: |
           echo "=============================="
           echo "AI Review Result"
           echo "=============================="
 
           cat review-result/review-report.json
+
+
+      # -------------------------------------------------
+      # 5. Checkout 默认分支代码
+      #
+      # 注意：
+      # 这里故意不 checkout PR。
+      #
+      # workflow_run 是高权限 workflow，
+      # 只能使用可信任的默认分支代码。
+      # -------------------------------------------------
+
+      - name: Checkout trusted repository code
+        uses: actions/checkout@v4
+
+
+      # -------------------------------------------------
+      # 6. Setup Python
+      # -------------------------------------------------
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # -------------------------------------------------
+      # 7. 安装依赖
+      # -------------------------------------------------
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+
+      # -------------------------------------------------
+      # 8. 发布 PR Comment
+      # -------------------------------------------------
+
+      - name: Create PR Comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+
+        run: |
+          python -c "
+          import os
+
+          from reviewer.commenter import create_pr_comment
+
+
+          repo = os.environ['GITHUB_REPOSITORY']
+
+
+          pr_number_text = os.environ.get(
+              'PR_NUMBER'
+          )
+
+
+          if not pr_number_text:
+              raise RuntimeError(
+                  'PR_NUMBER is empty'
+              )
+
+
+          pr_number = int(
+              pr_number_text
+          )
+
+
+          token = os.environ.get(
+              'GITHUB_TOKEN'
+          )
+
+
+          if not token:
+              raise RuntimeError(
+                  'GITHUB_TOKEN is empty'
+              )
+
+
+          response = create_pr_comment(
+              review_result_path=(
+                  'review-result/review-report.json'
+              ),
+              repo=repo,
+              pr_number=pr_number,
+              token=token,
+          )
+
+
+          comment_url = response.get(
+              'html_url'
+          )
+
+
+          if comment_url:
+              print(
+                  f'PR comment created: '
+                  f'{comment_url}'
+              )
+          else:
+              print(
+                  'PR comment created.'
+              )
+          "
