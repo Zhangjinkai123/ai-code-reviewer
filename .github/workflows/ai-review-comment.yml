@@ -1,48 +1,31 @@
 name: AI Code Review Comment
 
-
 on:
-
   workflow_run:
-
     workflows:
       - AI Code Review
-
     types:
       - completed
 
-
 permissions:
-
   contents: read
-
   issues: write
-
   pull-requests: write
 
-
 jobs:
-
-
   comment:
-
-
-    if: >
-      github.event.workflow_run.conclusion == 'success' ||
-      github.event.workflow_run.conclusion == 'failure'
-
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
 
     runs-on: ubuntu-latest
 
-
     steps:
 
+      # -------------------------------------------------
+      # 1. 显示上游 AI Review 信息
+      # -------------------------------------------------
 
-      -
-        name: Show workflow result
-
+      - name: Show workflow result
         run: |
-
           echo "Workflow:"
           echo "${{ github.event.workflow_run.name }}"
 
@@ -56,92 +39,92 @@ jobs:
           echo '${{ toJSON(github.event.workflow_run.pull_requests) }}'
 
 
-      -
-        name: Check Pull Request
+      # -------------------------------------------------
+      # 2. 获取 PR Number
+      # -------------------------------------------------
 
+      - name: Check Pull Request
         env:
-
-          PR_COUNT:
-            ${{ github.event.workflow_run.pull_requests && length(github.event.workflow_run.pull_requests) || 0 }}
-
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
         run: |
+          echo "PR_NUMBER=${PR_NUMBER}"
 
-          echo "PR count: ${PR_COUNT}"
-
-          if [ "${PR_COUNT}" -eq 0 ]; then
-
+          if [ -z "${PR_NUMBER}" ]; then
             echo "No Pull Request associated with this workflow run."
-
             exit 1
-
           fi
 
 
-      -
-        name: Download Review Result
+      # -------------------------------------------------
+      # 3. 下载上游 AI Review Artifact
+      # -------------------------------------------------
 
+      - name: Download Review Result
         uses: actions/download-artifact@v4
-
         with:
-
           name: ai-review-result
-
           path: review-result
-
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
           run-id: ${{ github.event.workflow_run.id }}
 
 
-      -
-        name: Show Review Result
+      # -------------------------------------------------
+      # 4. 查看 Review Result
+      # -------------------------------------------------
 
+      - name: Show Review Result
         run: |
-
           echo "=============================="
-
           echo "AI Review Result"
-
           echo "=============================="
 
           cat review-result/review-report.json
 
 
-      -
-        name: Setup Python
+      # -------------------------------------------------
+      # 5. Checkout 默认分支代码
+      #
+      # 注意：
+      # 这里故意不 checkout PR。
+      #
+      # workflow_run 是高权限 workflow，
+      # 只能使用可信任的默认分支代码。
+      # -------------------------------------------------
 
+      - name: Checkout trusted repository code
+        uses: actions/checkout@v4
+
+
+      # -------------------------------------------------
+      # 6. Setup Python
+      # -------------------------------------------------
+
+      - name: Setup Python
         uses: actions/setup-python@v5
-
         with:
-
           python-version: "3.11"
 
 
-      -
-        name: Install dependencies
+      # -------------------------------------------------
+      # 7. 安装依赖
+      # -------------------------------------------------
 
+      - name: Install dependencies
         run: |
-
           pip install -r requirements.txt
 
 
-      -
-        name: Create PR Comment
+      # -------------------------------------------------
+      # 8. 发布 PR Comment
+      # -------------------------------------------------
 
+      - name: Create PR Comment
         env:
-
-          GITHUB_TOKEN:
-            ${{ secrets.GITHUB_TOKEN }}
-
-          GITHUB_REPOSITORY:
-            ${{ github.repository }}
-
-          PR_NUMBER:
-            ${{ github.event.workflow_run.pull_requests[0].number }}
-
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
 
         run: |
-
           python -c "
           import os
 
@@ -157,7 +140,6 @@ jobs:
 
 
           if not pr_number_text:
-
               raise RuntimeError(
                   'PR_NUMBER is empty'
               )
@@ -174,7 +156,6 @@ jobs:
 
 
           if not token:
-
               raise RuntimeError(
                   'GITHUB_TOKEN is empty'
               )
@@ -196,14 +177,11 @@ jobs:
 
 
           if comment_url:
-
               print(
                   f'PR comment created: '
                   f'{comment_url}'
               )
-
           else:
-
               print(
                   'PR comment created.'
               )
