@@ -77,3 +77,19 @@ jobs:
         run: |
 
           python main.py review
+
+
+      -
+        name: Upload Review Result
+
+        if: always()
+
+        uses: actions/upload-artifact@v4
+
+        with:
+
+          name: ai-review-result
+
+          path: reports/review-report.json
+
+          if-no-files-found: error

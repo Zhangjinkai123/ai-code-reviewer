@@ -46,3 +46,33 @@ jobs:
 
           echo "Run ID:"
           echo "${{ github.event.workflow_run.id }}"
+
+
+      -
+        name: Download Review Result
+
+        uses: actions/download-artifact@v4
+
+        with:
+
+          name: ai-review-result
+
+          path: review-result
+
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          run-id: ${{ github.event.workflow_run.id }}
+
+
+      -
+        name: Show Review Result
+
+        run: |
+
+          echo "=============================="
+
+          echo "AI Review Result"
+
+          echo "=============================="
+
+          cat review-result/review-report.json
