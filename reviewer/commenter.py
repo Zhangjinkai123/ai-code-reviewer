@@ -1,3 +1,4 @@
+
 import json
 
 from reviewer.formatter import (
@@ -5,6 +6,7 @@ from reviewer.formatter import (
     format_review_markdown,
 )
 from reviewer.github import (
+    get_pr_head_sha,
     list_pr_comments,
     post_pr_comment,
     update_pr_comment,
@@ -28,6 +30,43 @@ def load_review_result(
 
     return ReviewResult(
         **data
+    )
+
+
+def filter_valid_issues(
+    result: ReviewResult,
+) -> ReviewResult:
+    """
+    过滤无效的 Review Issue。
+
+    过滤规则：
+    1. message 必须是非空字符串。
+    2. suggestion 必须是非空字符串。
+    3. 其他字段不参与有效性判断。
+    """
+
+    valid_issues = []
+
+    for issue in result.issues or []:
+        message = issue.message
+        suggestion = issue.suggestion
+
+        if not isinstance(message, str):
+            continue
+
+        if not isinstance(suggestion, str):
+            continue
+
+        if not message.strip():
+            continue
+
+        if not suggestion.strip():
+            continue
+
+        valid_issues.append(issue)
+
+    return ReviewResult(
+        issues=valid_issues
     )
 
 
@@ -60,6 +99,7 @@ def create_pr_comment(
     repo: str,
     pr_number: int,
     token: str,
+    commit_sha: str | None = None,
 ) -> dict:
     """
     创建或更新 GitHub PR 的 AI Review Comment。
@@ -94,7 +134,13 @@ def create_pr_comment(
         raise ValueError(
             "GitHub token cannot be empty"
         )
-
+    
+    if not commit_sha:
+        commit_sha = get_pr_head_sha(
+            repo=repo,
+            pr_number=pr_number,
+            token=token,
+        )
     # -------------------------------------------------
     # 1. 加载 ReviewResult
     # -------------------------------------------------
@@ -104,15 +150,25 @@ def create_pr_comment(
     )
 
     # -------------------------------------------------
-    # 2. ReviewResult -> Markdown
+    # 2. 过滤无效 Review Issue
     # -------------------------------------------------
 
-    markdown = format_review_markdown(
+    result = filter_valid_issues(
         result
     )
 
     # -------------------------------------------------
-    # 3. 获取 PR 现有评论
+    # 3. ReviewResult -> Markdown
+    # -------------------------------------------------
+
+    markdown = format_review_markdown(
+        result,
+    repo=repo,
+    commit_sha=commit_sha,
+    )
+
+    # -------------------------------------------------
+    # 4. 获取 PR 现有评论
     # -------------------------------------------------
 
     comments = list_pr_comments(
@@ -122,7 +178,7 @@ def create_pr_comment(
     )
 
     # -------------------------------------------------
-    # 4. 查找已有 AI Review 评论
+    # 5. 查找已有 AI Review 评论
     # -------------------------------------------------
 
     existing_comment = find_ai_review_comment(
@@ -130,7 +186,7 @@ def create_pr_comment(
     )
 
     # -------------------------------------------------
-    # 5. 已存在 -> 更新
+    # 6. 已存在 -> 更新
     # -------------------------------------------------
 
     if existing_comment:
@@ -154,7 +210,7 @@ def create_pr_comment(
         )
 
     # -------------------------------------------------
-    # 6. 不存在 -> 创建
+    # 7. 不存在 -> 创建
     # -------------------------------------------------
 
     return post_pr_comment(
