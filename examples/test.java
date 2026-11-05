@@ -6,6 +6,7 @@ public class test {
             + ids;
         System.out.println(sql);
         // Verify AI review comment update
+        // Test GitHub Actions permission workflow
         System.out.println("Hello World!");
     }
 }
