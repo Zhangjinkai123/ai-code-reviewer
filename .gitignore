@@ -17,3 +17,5 @@ venv/
 # 运行产物
 reports/
 *.log
+examples/yaml_regression_invalid.diff
+examples/yaml_regression_valid.diff
