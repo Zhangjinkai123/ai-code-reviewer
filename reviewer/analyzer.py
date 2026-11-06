@@ -55,31 +55,22 @@ def review_code(diff: str):
         extra_body={"reasoning": {"enabled": True}}
     )
     
-    result = json.loads(
-        response.choices[0].message.content
+    result = ReviewResult.model_validate(
+        json.loads(
+            response.choices[0].message.content
+        )
     )
 
-    # print(json.dumps(
-    # result,
-    # ensure_ascii=False,
-    # indent=2
-    # ))
-
-    issues = result["issues"]
-
-
-    for issue in issues:
+    for issue in result.issues:
 
         for context in contexts:
 
-            if context.file == issue["file"]:
+            if context.file == issue.file:
 
-                issue["line"] = locate_line(
+                issue.line = locate_line(
                     context,
-                    issue.get("code_snippet")
+                    issue.code_snippet
                 )
 
 
-    return ReviewResult(
-        issues=issues
-    )
+    return result

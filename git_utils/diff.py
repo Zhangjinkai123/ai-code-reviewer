@@ -2,6 +2,65 @@ import os
 import subprocess
 
 
+def _resolve_default_base():
+
+    candidates = []
+
+    symbolic_ref = subprocess.run(
+        [
+            "git",
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if symbolic_ref.returncode == 0:
+
+        ref = symbolic_ref.stdout.strip()
+
+        if ref:
+            candidates.append(ref)
+
+    candidates.extend(
+        [
+            "origin/master",
+            "origin/main",
+        ]
+    )
+
+    checked = set()
+
+    for ref in candidates:
+
+        if ref in checked:
+            continue
+
+        checked.add(ref)
+
+        result = subprocess.run(
+            [
+                "git",
+                "rev-parse",
+                "--verify",
+                f"{ref}^{{commit}}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode == 0:
+            return ref
+
+    raise RuntimeError(
+        "Unable to resolve the default Git base branch. "
+        "Expected origin/HEAD, origin/master, or origin/main."
+    )
+
+
 
 def get_git_diff():
 
@@ -22,10 +81,40 @@ def get_git_diff():
 
     else:
 
+        base_ref = _resolve_default_base()
+
+        merge_base = subprocess.run(
+            [
+                "git",
+                "merge-base",
+                base_ref,
+                "HEAD",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if merge_base.returncode != 0:
+            raise RuntimeError(
+                merge_base.stderr
+                or (
+                    "Unable to resolve the common ancestor "
+                    "between the default base and HEAD."
+                )
+            )
+
+        merge_base_sha = merge_base.stdout.strip()
+
+        if not merge_base_sha:
+            raise RuntimeError(
+                "Unable to resolve the common ancestor "
+                "between the default base and HEAD."
+            )
+
         cmd = [
             "git",
             "diff",
-            "origin/main..."
+            merge_base_sha,
         ]
 
 
