@@ -19,8 +19,8 @@ def load_review_result(
 
         data = json.load(f)
 
-    return ReviewResult(
-        **data
+    return ReviewResult.model_validate(
+        data
     )
 
 

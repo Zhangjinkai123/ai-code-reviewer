@@ -235,6 +235,17 @@ Push
 通过；上游本次仍为 Failed。 - 也不代表所有多
 Commit、并发或重试边界均已验收。
 
+### 5.4 2026-11-06 修复后的验收状态
+
+-   提交 `773180e` 修正本地审查使用共同祖先计算 Diff 的范围，并增加真实临时 Git 仓库分叉测试。
+-   本地标准库测试脚本全部通过：Parser、Locator、Diff、Reporter、Policy、Commenter、Formatter、GitHub API、PR Comment。
+-   GitHub Actions 上游 Run `42205849784` 对应 `773180e`，状态成功并生成 `ai-review-result` Artifact；下游 Run `42205902620` 状态成功。
+-   上游 Artifact 与下游下载通过 `workflow_run.id` 关联；评论文件链接使用对应上游 Run 的 `head_sha`。评论采用每次 Run 创建独立评论的设计，因此旧 Run 不会更新或覆盖新 Run 的评论。
+-   需要注意：`workflow_run` 工作流按 GitHub 安全模型使用默认分支可信代码。本次下游 Run 页面显示执行提交为默认分支 `16fb42e`，因此 `test001` 中尚未合并的评论实现不会被该次下游 Run 执行；这不表示 PR 分支代码可直接被高权限工作流执行。
+-   公开 PR 页面可以确认 AI Review 评论存在，但页面没有展示其对应的 Workflow Run ID 或完整 Commit SHA；同时无法读取 Artifact 内的报告内容。因此报告内容与该次评论的精确绑定，以及多次 Push 并发/乱序的真实线上表现仍未完成端到端核实。
+-   同一 Commit 重跑会创建重复评论；这是当前设计的已知限制，不应误记为已实现去重/更新。
+-   为避免短时间内重复触发 GitHub Actions 和加重限流，本次未额外 Push 测试提交。
+
 ## 6. 当前已知问题：GitHub Actions YAML 误报
 
 这是用户明确要求在 V1.0 初始版本主体完成后专项排查解决的问题。
@@ -296,24 +307,10 @@ Commit、并发或重试边界均已验收。
 
 ### 高优先级
 
-1.  **Commit SHA 与审查报告关联边界验证**
-    -   确认上游报告对应的确切 Commit SHA。
-    -   确认下游评论展示的 SHA 与上游运行的 `head_sha` 一致。
-    -   检查 PR 多次 Push 后，旧 Run 与新 Run
-        的报告/评论是否可能交叉或覆盖。
-2.  **PR 多 Commit 场景验证**
-    -   每次 Commit 是否独立触发审查。
-    -   每次运行的 Artifact 是否绑定对应 Workflow Run。
-    -   评论去重/更新行为是否符合已定设计。
-    -   并发、乱序完成、重试场景是否会造成旧结果覆盖新结果。
-3.  **完整回归测试**
-    -   Java / SQL 注入等问题识别。
-    -   Diff 行号与代码片段定位。
-    -   Issue 数据模型和 JSON 报告。
-    -   Policy 严重程度阈值。
-    -   合法/非法 YAML（误报专项在初始版本主体完成后处理）。
-    -   GitHub Actions 和 PR 评论端到端流程。
-4.  **V1.0 最终验收**
+1.  **Commit SHA 与审查报告关联边界**：代码配置已确认 Artifact 按上游 Run ID 下载，评论链接使用该 Run 的 `head_sha`；修复提交对应的上游 Run 已成功并生成 Artifact。仍需能查看 Artifact 内容或该次评论，才能确认报告与评论内容中的 SHA。
+2.  **PR 多 Commit / 并发边界**：代码结构确认每个 Run 使用自己的 Artifact 并新建独立评论，不存在覆盖另一条评论的更新操作。真实并发、乱序完成和重跑尚未线上演练；同一 Commit 重跑会产生重复评论，属于已知限制。
+3.  **本地完整回归**：所有现有标准库测试脚本已通过。真实 LLM 对 Java / SQL 注入的识别效果未在本轮重复调用验证；Diff 定位、报告、Policy、评论格式和 GitHub API 均有本地测试覆盖。YAML 合法/非法样例仍属于后续误报专项。
+4.  **V1.0 最终验收**：主功能和本地回归完成；线上 Workflow 成功与评论存在已得到公开页面证据，但 Artifact 内容和评论与具体 Run 的精确绑定仍缺少可核查证据。受 GitHub 限流风险约束，本轮不额外 Push 触发测试。补齐这两项证据后即可完成最终签收。
 
 ### 中优先级
 

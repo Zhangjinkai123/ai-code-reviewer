@@ -130,6 +130,54 @@ def test_commit_sha_required():
         os.unlink(review_file)
 
 
+def test_invalid_review_report_is_rejected():
+
+    temp_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        suffix=".json",
+        delete=False,
+    )
+
+    json.dump(
+        {
+            "issues": [
+                {
+                    "file": "UserService.java",
+                    "severity": "high",
+                    "category": "security",
+                    "message": "",
+                }
+            ]
+        },
+        temp_file,
+        ensure_ascii=False,
+    )
+
+    temp_file.close()
+
+    try:
+        try:
+            create_pr_comment(
+                review_result_path=temp_file.name,
+                repo="test/test",
+                pr_number=1,
+                token="test-token",
+                commit_sha="abc123456789",
+            )
+        except Exception as exc:
+            assert "suggestion" in str(exc)
+        else:
+            raise AssertionError(
+                "Expected invalid review report to be rejected"
+            )
+
+        print("[PASS] test_invalid_review_report_is_rejected")
+
+    finally:
+        os.unlink(temp_file.name)
+
+
 def test_filter_valid_issues():
 
     valid_issue = Issue(
@@ -241,6 +289,7 @@ def main():
 
     test_create_independent_comment()
     test_commit_sha_required()
+    test_invalid_review_report_is_rejected()
     test_filter_valid_issues()
     test_all_invalid_issues_generate_no_issues_comment()
 
