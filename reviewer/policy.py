@@ -44,6 +44,9 @@ def check_policy(
             "high"
         )
     )
+
+    if isinstance(threshold, str):
+        threshold = threshold.strip().lower()
     
     def validate_threshold(threshold):
 
@@ -64,19 +67,29 @@ def check_policy(
     )
 
 
+    has_blocking_issue = False
+
     for issue in result.issues:
 
-        issue_level = (
-            SEVERITY_LEVELS
-            .get(
-                issue.severity,
-                0
+        severity = issue.severity
+
+        if not isinstance(severity, str):
+            raise ValueError(
+                f"Invalid issue severity: {severity}"
             )
-        )
+
+        severity = severity.strip().lower()
+
+        if severity not in SEVERITY_LEVELS:
+            raise ValueError(
+                f"Invalid issue severity: {issue.severity}"
+            )
+
+        issue_level = SEVERITY_LEVELS[severity]
 
 
         if issue_level >= threshold_level:
 
-            return False
+            has_blocking_issue = True
 
-    return True
+    return not has_blocking_issue

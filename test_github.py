@@ -364,7 +364,7 @@ def test_get_pr_head_sha():
             token="fake-token",
         )
 
-    print("✓ test_get_pr_head_sha")
+    print("[PASS] test_get_pr_head_sha")
 
 
 def test_get_pr_head_sha_invalid_response():
@@ -387,7 +387,7 @@ def test_get_pr_head_sha_invalid_response():
                 "Expected GitHubAPIError"
             )
 
-    print("✓ test_get_pr_head_sha_invalid_response")
+    print("[PASS] test_get_pr_head_sha_invalid_response")
 
 
 
@@ -414,7 +414,7 @@ def main():
 
     for test in tests:
         test()
-        print(f"✓ {test.__name__}")
+        print(f"[PASS] {test.__name__}")
 
     print()
     print("All GitHub API tests passed.")

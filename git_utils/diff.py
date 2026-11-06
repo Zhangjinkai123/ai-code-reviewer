@@ -2,6 +2,65 @@ import os
 import subprocess
 
 
+def _resolve_default_base():
+
+    candidates = []
+
+    symbolic_ref = subprocess.run(
+        [
+            "git",
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if symbolic_ref.returncode == 0:
+
+        ref = symbolic_ref.stdout.strip()
+
+        if ref:
+            candidates.append(ref)
+
+    candidates.extend(
+        [
+            "origin/master",
+            "origin/main",
+        ]
+    )
+
+    checked = set()
+
+    for ref in candidates:
+
+        if ref in checked:
+            continue
+
+        checked.add(ref)
+
+        result = subprocess.run(
+            [
+                "git",
+                "rev-parse",
+                "--verify",
+                f"{ref}^{{commit}}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode == 0:
+            return ref
+
+    raise RuntimeError(
+        "Unable to resolve the default Git base branch. "
+        "Expected origin/HEAD, origin/master, or origin/main."
+    )
+
+
 
 def get_git_diff():
 
@@ -22,10 +81,12 @@ def get_git_diff():
 
     else:
 
+        base_ref = _resolve_default_base()
+
         cmd = [
             "git",
             "diff",
-            "origin/main..."
+            base_ref,
         ]
 
 
