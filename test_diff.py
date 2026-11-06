@@ -1,4 +1,7 @@
 import os
+from pathlib import Path
+import subprocess
+import tempfile
 from types import SimpleNamespace
 from unittest.mock import call, patch
 
@@ -22,6 +25,10 @@ def test_local_diff_includes_working_tree_changes():
             ),
             SimpleNamespace(
                 returncode=0,
+                stdout="merge-base-sha\n",
+            ),
+            SimpleNamespace(
+                returncode=0,
                 stdout="local diff",
             ),
         ],
@@ -30,7 +37,7 @@ def test_local_diff_includes_working_tree_changes():
 
     assert result == "local diff"
     assert mock_run.call_args_list[-1] == call(
-        ["git", "diff", "origin/master"],
+        ["git", "diff", "merge-base-sha"],
         capture_output=True,
         text=True,
     )
@@ -61,9 +68,58 @@ def test_actions_diff_uses_base_sha_and_head():
     print("[PASS] test_actions_diff_uses_base_sha_and_head")
 
 
+def test_diverged_base_excludes_base_only_changes():
+    original_directory = os.getcwd()
+
+    with tempfile.TemporaryDirectory() as directory:
+        def git(*args):
+            return subprocess.run(
+                ["git", "-C", directory, *args],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+
+        git("init", "-b", "base")
+        git("config", "user.name", "Diff Test")
+        git("config", "user.email", "diff-test@example.invalid")
+        tracked = Path(directory) / "tracked.txt"
+        tracked.write_text("initial\n", encoding="utf-8")
+        git("add", "tracked.txt")
+        git("commit", "-m", "initial")
+        ancestor = git("rev-parse", "HEAD")
+        base_only = Path(directory) / "base-only.txt"
+        base_only.write_text("base-only\n", encoding="utf-8")
+        git("add", "base-only.txt")
+        git("commit", "-m", "base change")
+        git("update-ref", "refs/remotes/origin/master", "HEAD")
+        git("checkout", "-b", "feature", ancestor)
+        tracked.write_text("feature\n", encoding="utf-8")
+        git("add", "tracked.txt")
+        git("commit", "-m", "feature change")
+        tracked.write_text("feature\nstaged\n", encoding="utf-8")
+        git("add", "tracked.txt")
+        tracked.write_text("feature\nstaged\nunstaged\n", encoding="utf-8")
+
+        try:
+            os.chdir(directory)
+            with patch.dict(os.environ, {"GITHUB_BASE_SHA": ""}):
+                diff = get_git_diff()
+        finally:
+            os.chdir(original_directory)
+
+        assert "base-only.txt" not in diff
+        assert "+feature" in diff
+        assert "+staged" in diff
+        assert "+unstaged" in diff
+
+    print("[PASS] test_diverged_base_excludes_base_only_changes")
+
+
 def main():
     test_local_diff_includes_working_tree_changes()
     test_actions_diff_uses_base_sha_and_head()
+    test_diverged_base_excludes_base_only_changes()
     print()
     print("All Git diff tests passed.")
 

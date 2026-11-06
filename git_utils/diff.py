@@ -83,10 +83,38 @@ def get_git_diff():
 
         base_ref = _resolve_default_base()
 
+        merge_base = subprocess.run(
+            [
+                "git",
+                "merge-base",
+                base_ref,
+                "HEAD",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if merge_base.returncode != 0:
+            raise RuntimeError(
+                merge_base.stderr
+                or (
+                    "Unable to resolve the common ancestor "
+                    "between the default base and HEAD."
+                )
+            )
+
+        merge_base_sha = merge_base.stdout.strip()
+
+        if not merge_base_sha:
+            raise RuntimeError(
+                "Unable to resolve the common ancestor "
+                "between the default base and HEAD."
+            )
+
         cmd = [
             "git",
             "diff",
-            base_ref,
+            merge_base_sha,
         ]
 
 

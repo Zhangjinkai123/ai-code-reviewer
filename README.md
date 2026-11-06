@@ -14,7 +14,7 @@ Git Diff
   -> Policy Gate
 ```
 
-本地运行 `review` 时，程序将当前工作树与 `origin/HEAD`（回退到 `origin/master` 或 `origin/main`）比较。GitHub Actions 中使用 `GITHUB_BASE_SHA`，比较 PR 基准提交与当前提交。
+本地运行 `review` 时，程序先获取 `HEAD` 与 `origin/HEAD`（回退到 `origin/master` 或 `origin/main`）的共同祖先，再与当前工作树比较，包含当前分支提交及已跟踪文件的暂存、未暂存改动，不包含未跟踪文件。GitHub Actions 中使用 `GITHUB_BASE_SHA`，比较 PR 基准提交与当前提交。
 
 ## 快速开始
 
