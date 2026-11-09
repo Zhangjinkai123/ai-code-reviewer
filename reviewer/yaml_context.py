@@ -133,12 +133,17 @@ def build_yaml_context(context: DiffContext) -> dict | None:
     )
 
     try:
-        document = yaml.compose(yaml_text, Loader=yaml.SafeLoader)
-        key_paths = (
-            _collect_key_paths(document, line_numbers)
-            if is_complete
-            else []
-        )
+        documents = list(yaml.compose_all(yaml_text, Loader=yaml.SafeLoader))
+        key_paths = []
+        budget = {"remaining": MAX_YAML_PATH_VISITS}
+        if is_complete:
+            for index, document in enumerate(documents, start=1):
+                entries = _collect_key_paths(
+                    document, line_numbers, budget=budget,
+                )
+                if len(documents) > 1:
+                    entries = [{**entry, "document": index} for entry in entries]
+                key_paths.extend(entries)
     except (OverflowError, RecursionError):
         return {
             "parse_status": "unavailable",
@@ -149,13 +154,6 @@ def build_yaml_context(context: DiffContext) -> dict | None:
     except yaml.YAMLError:
         return {
             "parse_status": "invalid" if is_complete else "unavailable",
-            "complete": is_complete,
-            "key_paths": [],
-        }
-
-    if document is None:
-        return {
-            "parse_status": "valid",
             "complete": is_complete,
             "key_paths": [],
         }

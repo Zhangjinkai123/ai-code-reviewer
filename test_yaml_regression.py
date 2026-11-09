@@ -239,6 +239,30 @@ def test_alias_expansion_has_a_shared_budget():
     print("[PASS] YAML alias expansion is bounded")
 
 
+def test_multiple_yaml_documents_preserve_lines_and_identity():
+    lines = [
+        "kind: ConfigMap", "metadata:", "  name: first",
+        "---", "kind: Service", "metadata:", "  name: second",
+    ]
+    diff = (
+        "--- /dev/null\n+++ b/resources.yaml\n"
+        f"@@ -0,0 +1,{len(lines)} @@\n"
+        + "\n".join("+" + line for line in lines)
+    )
+    context = parse_diff(diff)[0]
+    metadata = build_yaml_context(context)
+    assert metadata["parse_status"] == "valid"
+    assert metadata["complete"] is True
+    assert [
+        (entry["document"], entry["line"], entry["path"])
+        for entry in metadata["key_paths"]
+        if entry["key"] == "name"
+    ] == [(1, 3, "$.metadata.name"), (2, 7, "$.metadata.name")]
+    broken = diff.replace("+kind: Service", "+kind: [")
+    assert build_yaml_context(parse_diff(broken)[0])["parse_status"] == "invalid"
+    print("[PASS] Multi-document YAML preserves document identity and line numbers")
+
+
 def main():
     test_yaml_samples_are_syntax_valid()
     test_yaml_paths_distinguish_valid_and_invalid_layout()
@@ -250,6 +274,7 @@ def main():
     test_new_file_completeness_and_recursive_alias()
     test_complete_invalid_yaml_and_partial_invalid_yaml()
     test_alias_expansion_has_a_shared_budget()
+    test_multiple_yaml_documents_preserve_lines_and_identity()
     print()
     print("All YAML regression tests passed.")
 
