@@ -5,7 +5,10 @@ from config import settings
 
 from reviewer.locator import locate_line
 from reviewer.models import ReviewResult, DiffContext
-from reviewer.prompt import SYSTEM_PROMPT
+from reviewer.prompt import (
+    SYSTEM_PROMPT,
+    build_review_input,
+)
 from reviewer.parser import parse_diff
 
 
@@ -22,14 +25,7 @@ def review_code(diff: str):
 
 
     # 2. 转换成 JSON 给 LLM
-    review_input = json.dumps(
-        [
-            context.model_dump()
-            for context in contexts
-        ],
-        ensure_ascii=False,
-        indent=2
-    )
+    review_input = build_review_input(contexts)
     # print("================ LLM INPUT ================")
     # print(review_input)
 
@@ -55,31 +51,22 @@ def review_code(diff: str):
         extra_body={"reasoning": {"enabled": True}}
     )
     
-    result = json.loads(
-        response.choices[0].message.content
+    result = ReviewResult.model_validate(
+        json.loads(
+            response.choices[0].message.content
+        )
     )
 
-    # print(json.dumps(
-    # result,
-    # ensure_ascii=False,
-    # indent=2
-    # ))
-
-    issues = result["issues"]
-
-
-    for issue in issues:
+    for issue in result.issues:
 
         for context in contexts:
 
-            if context.file == issue["file"]:
+            if context.file == issue.file:
 
-                issue["line"] = locate_line(
+                issue.line = locate_line(
                     context,
-                    issue.get("code_snippet")
+                    issue.code_snippet
                 )
 
 
-    return ReviewResult(
-        issues=issues
-    )
+    return result

@@ -40,7 +40,7 @@ def test_basic_markdown():
     assert "24-25" in markdown
     assert "SQL Injection" in markdown
 
-    print("✓ test_basic_markdown")
+    print("[PASS] test_basic_markdown")
 
 
 def test_empty_result():
@@ -53,7 +53,7 @@ def test_empty_result():
     assert "No issues found" in markdown
     assert AI_REVIEW_MARKER in markdown
 
-    print("✓ test_empty_result")
+    print("[PASS] test_empty_result")
 
 
 def test_markdown_special_characters():
@@ -66,7 +66,7 @@ def test_markdown_special_characters():
     assert r"\<" in escaped
     assert r"\>" in escaped
 
-    print("✓ test_markdown_special_characters")
+    print("[PASS] test_markdown_special_characters")
 
 
 def test_inline_code_backticks():
@@ -77,7 +77,7 @@ def test_inline_code_backticks():
     assert formatted.startswith("```")
     assert formatted.endswith("```")
 
-    print("✓ test_inline_code_backticks")
+    print("[PASS] test_inline_code_backticks")
 
 
 def test_code_block_backticks():
@@ -88,7 +88,7 @@ def test_code_block_backticks():
     assert formatted.startswith("````java")
     assert formatted.endswith("````")
 
-    print("✓ test_code_block_backticks")
+    print("[PASS] test_code_block_backticks")
 
 
 def test_special_characters_in_issue():
@@ -110,7 +110,7 @@ def test_special_characters_in_issue():
     assert r"\`" in markdown
     assert "````java" in markdown
 
-    print("✓ test_special_characters_in_issue")
+    print("[PASS] test_special_characters_in_issue")
 
 
 def test_missing_optional_fields():
@@ -132,7 +132,7 @@ def test_missing_optional_fields():
     assert "未分类" in markdown
     assert "未提供" not in markdown
 
-    print("✓ test_missing_optional_fields")
+    print("[PASS] test_missing_optional_fields")
 
 def test_comment_length_limit():
     from reviewer.formatter import MAX_COMMENT_LENGTH
@@ -152,7 +152,7 @@ def test_comment_length_limit():
     assert AI_REVIEW_MARKER in markdown
     assert "评论内容过长" in markdown
 
-    print("✓ test_comment_length_limit")
+    print("[PASS] test_comment_length_limit")
 
 
 def test_comment_without_truncation():
@@ -165,7 +165,7 @@ def test_comment_without_truncation():
     assert "评论内容过长" not in markdown
     assert AI_REVIEW_MARKER in markdown
 
-    print("✓ test_comment_without_truncation")
+    print("[PASS] test_comment_without_truncation")
 
 def test_single_issue_formatting_isolation():
     from unittest.mock import patch
@@ -209,7 +209,7 @@ def test_single_issue_formatting_isolation():
     assert "另一个正常的问题" in markdown
     assert "SQL Injection" not in markdown
 
-    print("✓ test_single_issue_formatting_isolation")
+    print("[PASS] test_single_issue_formatting_isolation")
 
 def test_severity_summary():
     from reviewer.formatter import summarize_issues
@@ -232,7 +232,7 @@ def test_severity_summary():
     assert summary["LOW"] == 1
     assert summary["UNKNOWN"] == 1
 
-    print("✓ test_severity_summary")
+    print("[PASS] test_severity_summary")
 
 def test_severity_summary_case_insensitive():
     from reviewer.formatter import summarize_issues
@@ -250,7 +250,7 @@ def test_severity_summary_case_insensitive():
     assert summary["HIGH"] == 3
     assert summary["MEDIUM"] == 1
 
-    print("✓ test_severity_summary_case_insensitive")
+    print("[PASS] test_severity_summary_case_insensitive")
 
 
 def test_severity_summary_unknown():
@@ -267,7 +267,7 @@ def test_severity_summary_unknown():
     assert summary["total"] == 3
     assert summary["UNKNOWN"] == 3
 
-    print("✓ test_severity_summary_unknown")
+    print("[PASS] test_severity_summary_unknown")
 
 
 def test_severity_summary_empty():
@@ -282,7 +282,7 @@ def test_severity_summary_empty():
     assert summary["LOW"] == 0
     assert summary["UNKNOWN"] == 0
 
-    print("✓ test_severity_summary_empty")
+    print("[PASS] test_severity_summary_empty")
 
 def test_severity_summary_in_markdown():
     result = ReviewResult(
@@ -304,7 +304,7 @@ def test_severity_summary_in_markdown():
     assert "| LOW | 1 |" in markdown
     assert "| UNKNOWN | 0 |" in markdown
 
-    print("✓ test_severity_summary_in_markdown")
+    print("[PASS] test_severity_summary_in_markdown")
 
 def test_github_file_link():
     result = ReviewResult(
@@ -329,7 +329,7 @@ def test_github_file_link():
 
     assert "[`src/UserService.java`](https://github.com/" in markdown
 
-    print("✓ test_github_file_link")
+    print("[PASS] test_github_file_link")
 
 
 def test_without_github_context():
@@ -342,7 +342,7 @@ def test_without_github_context():
     assert "https://github.com/" not in markdown
     assert "**File:** `UserService.java`" in markdown
 
-    print("✓ test_without_github_context")
+    print("[PASS] test_without_github_context")
 
 def test_github_line_link():
     result = ReviewResult(
@@ -362,7 +362,7 @@ def test_github_line_link():
 
     assert "#L24-L25" in markdown
 
-    print("✓ test_github_line_link")
+    print("[PASS] test_github_line_link")
 
 
 def test_github_single_line_link():
@@ -383,13 +383,27 @@ def test_github_single_line_link():
 
     assert "#L24" in markdown
 
-    print("✓ test_github_single_line_link")
+    print("[PASS] test_github_single_line_link")
 
 
 
+
+
+def test_empty_report_keeps_source_identity():
+    markdown = format_review_markdown(
+        ReviewResult(issues=[]),
+        repo="owner/repository",
+        commit_sha="a" * 40,
+        run_id=123456,
+    )
+    assert "a" * 40 in markdown
+    assert "https://github.com/owner/repository/actions/runs/123456" in markdown
+    assert "No issues found" in markdown
+    print("[PASS] test_empty_report_keeps_source_identity")
 
 
 def main():
+    test_empty_report_keeps_source_identity()
     test_basic_markdown()
     test_empty_result()
     test_markdown_special_characters()

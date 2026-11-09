@@ -141,7 +141,7 @@ def test_pr_comment_flow(
 
 
     print(
-        "✓ GitHub PR comment flow passed"
+        "[PASS] GitHub PR comment flow passed"
     )
 
 
