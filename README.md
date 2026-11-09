@@ -128,7 +128,12 @@ python test_commenter.py
 python test_formatter.py
 python test_github.py
 python test_pr_comment.py
+python test_workflow.py
 ```
+
+`test_workflow.py` 读取实际双 Workflow，并执行其中的评论脚本，覆盖门禁失败后
+报告与评论生成、无问题放行、乱序完成和同一提交重跑。模型服务与 HTTP 发布
+均使用模拟响应，该测试不构成 GitHub 线上验收。
 
 `test_analyzer.py` 默认使用模拟模型响应，不读取模型配置或发起请求，覆盖响应校验、
 行号定位、报告往返、门禁失败后独立生成评论。需要真实模型验收时，显式运行：
@@ -147,7 +152,10 @@ SQL 注入能定位；报告保存在被忽略的 `reports/live-*.json`，不会
 - V1.0 不包含数据库、审查历史持久化、Web 管理台或自动修复。
 - 报告通过 GitHub Actions Artifact 保留。
 - 当前 LLM 调用使用 `chat.completions.create`，暂不迁移 Responses API。
-- 2026-11-09 已通过 11 个本地测试脚本及上述三个真实模型样例。单次固定样例
-  验证不能保证消除所有配置误报；当前修改尚待合并后进行一次 GitHub Actions 验收。
+- 2026-11-09 已通过 12 个本地测试脚本；此前三个真实模型样例也已通过。
+  模型额度恢复后，PR #9 上游 Run `42580799603` 第 2 次运行成功，
+  下载的实际 Artifact 报告为 `{"issues":[]}`。
+- 补充测试与记录集中提交后合并；合并后仍需核对真实高危/无问题报告、
+  门禁及新版评论中的 Commit SHA 与 Run 链接，完成最终发布签收。
 - YAML 仅在 Diff 明确包含完整新文件时提供完整路径；已有文件的局部 Diff
   保守标记为不完整。配置上下文不足时只跳过无法确认的配置问题。
