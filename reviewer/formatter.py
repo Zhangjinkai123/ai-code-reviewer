@@ -261,6 +261,7 @@ def format_review_markdown(
     result: ReviewResult,
     repo: str | None = None,
     commit_sha: str | None = None,
+    run_id: int | None = None,
 ) -> str:
     """
     将 ReviewResult 转换成 GitHub PR Comment 使用的 Markdown。
@@ -277,6 +278,15 @@ def format_review_markdown(
         "## 🤖 AI Code Review",
         "",
     ]
+
+    if commit_sha:
+        lines.extend([f"Commit: {format_inline_code(commit_sha)}", ""])
+    if repo and run_id:
+        lines.extend([
+            f"Source: [Actions run {run_id}]"
+            f"(https://github.com/{repo}/actions/runs/{run_id})",
+            "",
+        ])
 
     issues = result.issues or []
 

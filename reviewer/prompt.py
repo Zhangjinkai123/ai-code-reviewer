@@ -1,3 +1,52 @@
+import json
+
+from reviewer.models import DiffContext
+from reviewer.yaml_context import build_yaml_context
+
+
+def build_review_input(contexts: list[DiffContext]) -> str:
+    """
+    将 Diff 上下文序列化为带缩进和 YAML 路径信息的审查输入。
+    """
+    payload = []
+
+    for context in contexts:
+        lines = []
+
+        for line in context.lines:
+            content = line.content
+            leading_whitespace = content[
+                :len(content) - len(content.lstrip())
+            ]
+
+            lines.append(
+                {
+                    **line.model_dump(),
+                    "indent": len(
+                        leading_whitespace.expandtabs(2)
+                    ),
+                }
+            )
+
+        item = {
+            "file": context.file,
+            "lines": lines,
+        }
+
+        yaml_context = build_yaml_context(context)
+
+        if yaml_context is not None:
+            item["yaml_context"] = yaml_context
+
+        payload.append(item)
+
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 SYSTEM_PROMPT = """
 
 你是一名资深代码审查工程师，负责对 Git Diff 中的代码修改进行严格、客观、准确的审查。
@@ -10,14 +59,26 @@ SYSTEM_PROMPT = """
 
 [
   {
-    "file": "UserService.java",
+    "file": ".github/workflows/test.yml",
     "lines": [
       {
         "line": 17,
-        "content": "String sql =",
-        "type": "add"
+        "content": "        env:",
+        "type": "add",
+        "indent": 8
       }
-    ]
+    ],
+    "yaml_context": {
+      "parse_status": "valid",
+      "complete": true,
+      "key_paths": [
+        {
+          "line": 18,
+          "key": "GITHUB_TOKEN",
+          "path": "$.jobs.comment.steps[0].env.GITHUB_TOKEN"
+        }
+      ]
+    }
   }
 ]
 
@@ -46,6 +107,23 @@ SYSTEM_PROMPT = """
 5. 只有能够确认违反 YAML 语法或实际配置规范时，才能报告配置错误。
 6. 不得将合理的环境变量配置、表达式、条件判断或工作流步骤误判为配置错误。
 7. 如果不能确认配置是否违反规范，不得输出确定性的错误结论。
+
+### 2.1 YAML 语法与结构
+
+1. `indent` 是输入代码中每行前导空白的宽度，仅用于辅助还原层级，不能单独作为错误依据。
+2. `yaml_context.parse_status` 为 `valid` 只表示当前可见内容能被 YAML 解析，不代表 GitHub Actions schema 一定正确；为 `invalid` 时也必须确认当前 Diff 是完整文件。
+3. `yaml_context.complete` 为 `false` 或 `parse_status` 为 `unavailable` 时，说明 Diff 可能缺少文件上下文；不得据此推断缺失节点、父级关系或语法错误。
+4. `yaml_context.key_paths` 仅作为父级路径线索。必须同时核对原始行、同级节点和实际配置规范。
+5. 合法的 YAML 表达式（例如 `${{ secrets.GITHUB_TOKEN }}`）、环境变量名和多行 `run` 内容不得被改写或误报。
+
+### 2.2 GitHub Actions Workflow schema
+
+1. 工作流顶层常见键包括 `name`、`on`、`permissions`、`env`、`defaults`、`concurrency` 和 `jobs`；不要因为 `on` 被 YAML 解析器视为布尔样式而报告问题。
+2. `jobs.<job>` 下常见键包括 `name`、`permissions`、`needs`、`if`、`runs-on`、`environment`、`outputs`、`env`、`defaults`、`steps`、`strategy`、`timeout-minutes`、`container`、`services`、`uses` 和 `with`。
+3. `jobs.<job>.steps[*]` 下允许的键包括 `name`、`id`、`if`、`uses`、`run`、`with`、`env`、`continue-on-error`、`timeout-minutes`、`shell` 和 `working-directory`。
+4. `env` 和 `with` 内的自定义键名是允许的；不能把环境变量或 Action 输入误判为未知字段。
+5. 只有当完整路径和同级关系都能确认时，才报告 step 层级未知键、`env`/`with` 放错层级等 schema 错误。例如，`COMMIT_SHA` 与 `env` 同级且位于 `jobs.<job>.steps[*]` 下时，才可确认它不是该步骤的环境变量。
+6. 如果只能看到局部 Diff，无法确认某个键属于 `env`、`with`、job 或 step，则只跳过该配置层级问题，不要用“看起来缩进不一致”作为结论；仍须报告输入能够充分证明的其他缺陷。没有其他能够确认的问题时，返回空 `issues`。
 
 ## 三、严重程度判断
 

@@ -389,7 +389,21 @@ def test_github_single_line_link():
 
 
 
+def test_empty_report_keeps_source_identity():
+    markdown = format_review_markdown(
+        ReviewResult(issues=[]),
+        repo="owner/repository",
+        commit_sha="a" * 40,
+        run_id=123456,
+    )
+    assert "a" * 40 in markdown
+    assert "https://github.com/owner/repository/actions/runs/123456" in markdown
+    assert "No issues found" in markdown
+    print("[PASS] test_empty_report_keeps_source_identity")
+
+
 def main():
+    test_empty_report_keeps_source_identity()
     test_basic_markdown()
     test_empty_result()
     test_markdown_special_characters()

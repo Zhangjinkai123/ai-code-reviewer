@@ -16,6 +16,8 @@ class DiffContext(BaseModel):
 
     lines: List[DiffLine]
 
+    complete: bool = False
+
 class Issue(BaseModel):
 
     file: str = "unknown"

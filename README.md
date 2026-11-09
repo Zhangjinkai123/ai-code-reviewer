@@ -67,6 +67,8 @@ review:
 2. `AI Code Review Comment` 监听上游 `workflow_run.completed`，使用上游 Run ID 下载对应 Artifact，再用高权限 `GITHUB_TOKEN` 创建 PR 评论。
 
 评论 Workflow 只检出默认分支上的可信代码，不执行 PR 提交中的代码。报告包含问题时，评论中的文件链接使用本次上游 Run 的 `head_sha`，指向对应提交。
+评论头部显示完整提交 SHA 和上游 Actions Run 链接，空问题报告也可核对来源。
+评论工作流显式声明 `actions: read`，用于读取上游 Run 的 Artifact。
 
 由于 `workflow_run` 使用默认分支上的工作流和代码，PR 分支中尚未合并的评论逻辑不会在高权限评论 Workflow 中执行；这是安全边界的一部分。
 
@@ -102,7 +104,8 @@ ai-code-reviewer/
 │   ├── models.py            # Pydantic 模型
 │   ├── parser.py            # Diff 解析
 │   ├── policy.py            # 严重程度门禁
-│   └── reporter.py          # 控制台与 JSON 报告
+│   ├── reporter.py          # 控制台与 JSON 报告
+│   └── yaml_context.py      # YAML 结构路径与完整性元数据
 ├── main.py
 ├── review.yaml
 └── requirements.txt
@@ -113,8 +116,10 @@ ai-code-reviewer/
 项目没有 pytest 套件，使用标准库脚本：
 
 ```powershell
-python -m py_compile git_utils/diff.py reviewer/policy.py
+python -m compileall -q main.py config.py git_utils reviewer
 python test_parser.py
+python test_yaml_regression.py
+python test_analyzer.py
 python test_locator.py
 python test_diff.py
 python test_reporter.py
@@ -125,9 +130,24 @@ python test_github.py
 python test_pr_comment.py
 ```
 
+`test_analyzer.py` 默认使用模拟模型响应，不读取模型配置或发起请求，覆盖响应校验、
+行号定位、报告往返、门禁失败后独立生成评论。需要真实模型验收时，显式运行：
+
+```powershell
+python test_analyzer.py --live valid
+python test_analyzer.py --live invalid
+python test_analyzer.py --live sql
+```
+
+这些命令使用项目现有模型配置，分别检查合法 YAML 不误报、错误层级能识别、
+SQL 注入能定位；报告保存在被忽略的 `reports/live-*.json`，不会发布 GitHub 评论。
+
 ## 当前范围与限制
 
 - V1.0 不包含数据库、审查历史持久化、Web 管理台或自动修复。
 - 报告通过 GitHub Actions Artifact 保留。
 - 当前 LLM 调用使用 `chat.completions.create`，暂不迁移 Responses API。
-- YAML 合法/非法配置误报专项将在 V1.0 主体验收后单独处理。
+- 2026-11-09 已通过 11 个本地测试脚本及上述三个真实模型样例。单次固定样例
+  验证不能保证消除所有配置误报；当前修改尚待合并后进行一次 GitHub Actions 验收。
+- YAML 仅在 Diff 明确包含完整新文件时提供完整路径；已有文件的局部 Diff
+  保守标记为不完整。配置上下文不足时只跳过无法确认的配置问题。

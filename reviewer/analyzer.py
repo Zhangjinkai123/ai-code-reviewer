@@ -5,7 +5,10 @@ from config import settings
 
 from reviewer.locator import locate_line
 from reviewer.models import ReviewResult, DiffContext
-from reviewer.prompt import SYSTEM_PROMPT
+from reviewer.prompt import (
+    SYSTEM_PROMPT,
+    build_review_input,
+)
 from reviewer.parser import parse_diff
 
 
@@ -22,14 +25,7 @@ def review_code(diff: str):
 
 
     # 2. 转换成 JSON 给 LLM
-    review_input = json.dumps(
-        [
-            context.model_dump()
-            for context in contexts
-        ],
-        ensure_ascii=False,
-        indent=2
-    )
+    review_input = build_review_input(contexts)
     # print("================ LLM INPUT ================")
     # print(review_input)
 

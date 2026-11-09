@@ -67,6 +67,7 @@ def create_pr_comment(
     pr_number: int,
     token: str,
     commit_sha: str,
+    run_id: int | None = None,
 ) -> dict:
     """
     为 GitHub PR 创建一条独立的 AI Review Comment。
@@ -124,6 +125,7 @@ def create_pr_comment(
         result,
         repo=repo,
         commit_sha=commit_sha,
+        run_id=run_id,
     )
 
     # -------------------------------------------------

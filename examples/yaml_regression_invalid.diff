@@ -1,0 +1,25 @@
+diff --git a/.github/workflows/test.yml b/.github/workflows/test.yml
+new file mode 100644
+--- /dev/null
++++ b/.github/workflows/test.yml
+@@ -0,0 +1,20 @@
++name: YAML Regression Test
++
++on:
++  workflow_run:
++    workflows:
++      - AI Code Review
++    types:
++      - completed
++
++jobs:
++  comment:
++    runs-on: ubuntu-latest
++    steps:
++      - name: Create PR Comment
++        env:
++          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          GITHUB_REPOSITORY: ${{ github.repository }}
++          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
++        COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
++        run: echo "Create comment"
