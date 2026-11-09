@@ -6,6 +6,9 @@ from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 from reviewer.models import DiffContext
 
 
+MAX_YAML_PATH_VISITS = 4096
+
+
 def _is_yaml_file(filename: str) -> bool:
     return filename.lower().endswith((".yml", ".yaml"))
 
@@ -29,8 +32,15 @@ def _collect_key_paths(
     line_numbers,
     path=(),
     ancestors=frozenset(),
+    budget=None,
 ):
     entries = []
+
+    if budget is None:
+        budget = {"remaining": MAX_YAML_PATH_VISITS}
+    budget["remaining"] -= 1
+    if budget["remaining"] < 0:
+        raise OverflowError("YAML path traversal limit exceeded")
 
     if id(node) in ancestors:
         return entries
@@ -38,6 +48,9 @@ def _collect_key_paths(
 
     if isinstance(node, MappingNode):
         for key_node, value_node in node.value:
+            budget["remaining"] -= 1
+            if budget["remaining"] < 0:
+                raise OverflowError("YAML path traversal limit exceeded")
             if not isinstance(key_node, ScalarNode):
                 continue
 
@@ -60,6 +73,7 @@ def _collect_key_paths(
                     line_numbers,
                     current_path,
                     ancestors,
+                    budget,
                 )
             )
 
@@ -71,6 +85,7 @@ def _collect_key_paths(
                     line_numbers,
                     (*path, index),
                     ancestors,
+                    budget,
                 )
             )
 
@@ -124,7 +139,14 @@ def build_yaml_context(context: DiffContext) -> dict | None:
             if is_complete
             else []
         )
-    except (yaml.YAMLError, RecursionError):
+    except (OverflowError, RecursionError):
+        return {
+            "parse_status": "unavailable",
+            "complete": False,
+            "key_paths": [],
+            "reason": "structure_limit",
+        }
+    except yaml.YAMLError:
         return {
             "parse_status": "invalid" if is_complete else "unavailable",
             "complete": is_complete,

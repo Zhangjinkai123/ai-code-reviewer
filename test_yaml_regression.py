@@ -213,6 +213,32 @@ def test_complete_invalid_yaml_and_partial_invalid_yaml():
     assert build_yaml_context(context)["parse_status"] == "unavailable"
 
 
+def test_alias_expansion_has_a_shared_budget():
+    lines = ["root: &level0 {leaf: value}"]
+    for index in range(1, 24):
+        lines.append(
+            f"level{index}: &level{index} "
+            f"[*level{index - 1}, *level{index - 1}]"
+        )
+    diff = (
+        "--- /dev/null\n+++ b/test.yml\n"
+        f"@@ -0,0 +1,{len(lines)} @@\n"
+        + "\n".join("+" + line for line in lines)
+    )
+    context = parse_diff(diff)[0]
+    assert context.complete is True
+    metadata = build_yaml_context(context)
+    assert metadata == {
+        "parse_status": "unavailable",
+        "complete": False,
+        "key_paths": [],
+        "reason": "structure_limit",
+    }
+    payload = json.loads(build_review_input([context]))
+    assert payload[0]["yaml_context"] == metadata
+    print("[PASS] YAML alias expansion is bounded")
+
+
 def main():
     test_yaml_samples_are_syntax_valid()
     test_yaml_paths_distinguish_valid_and_invalid_layout()
@@ -223,6 +249,7 @@ def main():
     test_context_indentation_and_hunk_boundaries()
     test_new_file_completeness_and_recursive_alias()
     test_complete_invalid_yaml_and_partial_invalid_yaml()
+    test_alias_expansion_has_a_shared_budget()
     print()
     print("All YAML regression tests passed.")
 
