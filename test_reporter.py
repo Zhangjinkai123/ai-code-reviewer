@@ -81,9 +81,23 @@ def test_empty_report_round_trip():
         os.unlink(temp_file.name)
 
 
+def test_nested_output_directory_created():
+    """插件形态下报告可能写到多级目录，必须自动创建。"""
+    with tempfile.TemporaryDirectory() as directory:
+        target = os.path.join(directory, "a", "b", "c", "report.json")
+
+        save_report(ReviewResult(issues=[]), target)
+
+        assert os.path.exists(target)
+        assert load_review_result(target).issues == []
+
+    print("[PASS] test_nested_output_directory_created")
+
+
 def main():
     test_report_round_trip()
     test_empty_report_round_trip()
+    test_nested_output_directory_created()
     print()
     print("All reporter tests passed.")
 

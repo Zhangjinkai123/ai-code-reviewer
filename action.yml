@@ -1,0 +1,71 @@
+name: 'AI Code Reviewer'
+description: '基于大模型的 PR 代码审查：解析 Git Diff、生成结构化问题、按严重程度门禁'
+author: 'zjk'
+
+branding:
+  icon: 'search'
+  color: 'blue'
+
+inputs:
+  api-key:
+    description: 'OpenAI 兼容服务的 API Key'
+    required: true
+  base-url:
+    description: 'OpenAI 兼容服务的 Base URL'
+    required: true
+  model:
+    description: '模型名称'
+    required: true
+  base-sha:
+    description: '审查基准提交；为空时使用默认分支共同祖先'
+    required: false
+    default: ''
+  repo-dir:
+    description: '被审查仓库目录；默认为当前工作目录'
+    required: false
+    default: '.'
+  config-path:
+    description: '策略文件路径；不存在时使用内置默认阈值 high'
+    required: false
+    default: 'review.yaml'
+  report-path:
+    description: 'JSON 报告输出路径'
+    required: false
+    default: 'reports/review-report.json'
+
+outputs:
+  report-path:
+    description: '生成的 JSON 报告路径'
+    value: ${{ steps.review.outputs.report_path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    # 依赖从 Action 自身目录安装，不使用目标仓库的 requirements.txt。
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --disable-pip-version-check \
+          -r "${{ github.action_path }}/requirements.txt"
+
+    - name: Run AI Review
+      id: review
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        OPENAI_API_KEY: ${{ inputs.api-key }}
+        OPENAI_BASE_URL: ${{ inputs.base-url }}
+        LLM_MODEL: ${{ inputs.model }}
+        GITHUB_BASE_SHA: ${{ inputs.base-sha }}
+        REVIEW_REPO_DIR: ${{ inputs.repo-dir }}
+        REVIEW_CONFIG_PATH: ${{ inputs.config-path }}
+        REVIEW_REPORT_PATH: ${{ inputs.report-path }}
+      run: |
+        # 工具代码来自 Action 自身检出目录，不是目标仓库。
+        python "${{ github.action_path }}/main.py" review
+        echo "report_path=${REVIEW_REPORT_PATH}" >> "$GITHUB_OUTPUT"

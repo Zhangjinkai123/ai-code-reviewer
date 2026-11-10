@@ -127,10 +127,18 @@ def main():
 
     print_report(result)
 
-    save_report(result)
+    # 插件形态下报告路径由调用方指定，默认保持原有位置。
+    save_report(
+        result,
+        os.getenv("REVIEW_REPORT_PATH")
+        or "reports/review-report.json"
+    )
 
 
-    policy = load_policy()
+    policy = load_policy(
+        os.getenv("REVIEW_CONFIG_PATH")
+        or "review.yaml"
+    )
 
     passed = check_policy(
         result,
