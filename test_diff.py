@@ -116,10 +116,44 @@ def test_diverged_base_excludes_base_only_changes():
     print("[PASS] test_diverged_base_excludes_base_only_changes")
 
 
+def test_repo_dir_uses_git_dash_c():
+    """指定 repo_dir 时所有 git 调用都必须带 -C，否则会读错仓库。"""
+    with patch.dict(
+        os.environ,
+        {"GITHUB_BASE_SHA": ""},
+    ), patch(
+        "git_utils.diff.subprocess.run",
+        side_effect=[
+            SimpleNamespace(returncode=0, stdout="origin/master\n"),
+            SimpleNamespace(returncode=0, stdout=""),
+            SimpleNamespace(returncode=0, stdout="merge-base-sha\n"),
+            SimpleNamespace(returncode=0, stdout="other repo diff"),
+        ],
+    ) as mock_run:
+        result = get_git_diff(repo_dir="/path/to/other-repo")
+
+    assert result == "other repo diff"
+
+    for item in mock_run.call_args_list:
+        command = item.args[0]
+        assert command[:2] == ["git", "-C"], f"缺少 -C: {command}"
+        assert command[2] == "/path/to/other-repo"
+
+    # 关键回归：最终的 diff 命令也必须带 -C，否则会退回到进程工作目录。
+    assert mock_run.call_args_list[-1] == call(
+        ["git", "-C", "/path/to/other-repo", "diff", "merge-base-sha"],
+        capture_output=True,
+        text=True,
+    )
+
+    print("[PASS] test_repo_dir_uses_git_dash_c")
+
+
 def main():
     test_local_diff_includes_working_tree_changes()
     test_actions_diff_uses_base_sha_and_head()
     test_diverged_base_excludes_base_only_changes()
+    test_repo_dir_uses_git_dash_c()
     print()
     print("All Git diff tests passed.")
 

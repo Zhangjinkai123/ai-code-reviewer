@@ -47,7 +47,10 @@ def main():
 
     elif command == "review":
 
-        diff = get_git_diff()
+        # 插件形态下可以从任意目录审查指定仓库。
+        repo_dir = os.getenv("REVIEW_REPO_DIR") or None
+
+        diff = get_git_diff(repo_dir=repo_dir)
 
 
     elif command == "pr-comment":
@@ -92,7 +95,9 @@ def main():
             raise SystemExit(1)
 
 
-        diff = get_git_diff()
+        diff = get_git_diff(
+            repo_dir=os.getenv("REVIEW_REPO_DIR") or None
+        )
 
 
     else:

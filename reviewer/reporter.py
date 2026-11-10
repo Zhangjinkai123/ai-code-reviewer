@@ -6,7 +6,9 @@ def save_report(result, filename="reports/review-report.json"):
 
     path = Path(filename)
 
+    # 目标项目可能配置多级输出目录，必须递归创建。
     path.parent.mkdir(
+        parents=True,
         exist_ok=True
     )
 

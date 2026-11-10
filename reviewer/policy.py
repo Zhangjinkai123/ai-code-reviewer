@@ -6,6 +6,14 @@ SEVERITY_LEVELS = {
 }
 
 
+# 目标项目可以不提供 review.yaml，此时使用内置默认策略。
+DEFAULT_POLICY = {
+    "review": {
+        "severity_threshold": "high"
+    }
+}
+
+
 
 def load_policy(
     filename="review.yaml"
@@ -13,12 +21,32 @@ def load_policy(
 
     import yaml
 
+    from pathlib import Path
+
+    path = Path(filename)
+
+
+    # 缺少策略文件不是错误：插件形态下目标项目通常不提供该文件。
+    if not path.exists():
+
+        return DEFAULT_POLICY
+
+
     with open(
-        filename,
+        path,
         encoding="utf-8"
     ) as f:
 
-        return yaml.safe_load(f)
+        policy = yaml.safe_load(f)
+
+
+    # 空文件同样回落到默认策略，避免后续 .get 失败。
+    if policy is None:
+
+        return DEFAULT_POLICY
+
+
+    return policy
 
 
 

@@ -2,18 +2,28 @@ import os
 import subprocess
 
 
-def _resolve_default_base():
+def _git_command(repo_dir, *args):
+    """构造 git 命令；指定 repo_dir 时用 -C，否则保持原有行为。"""
+
+    if repo_dir:
+
+        return ["git", "-C", str(repo_dir), *args]
+
+    return ["git", *args]
+
+
+def _resolve_default_base(repo_dir=None):
 
     candidates = []
 
     symbolic_ref = subprocess.run(
-        [
-            "git",
+        _git_command(
+            repo_dir,
             "symbolic-ref",
             "--quiet",
             "--short",
             "refs/remotes/origin/HEAD",
-        ],
+        ),
         capture_output=True,
         text=True,
     )
@@ -42,12 +52,12 @@ def _resolve_default_base():
         checked.add(ref)
 
         result = subprocess.run(
-            [
-                "git",
+            _git_command(
+                repo_dir,
                 "rev-parse",
                 "--verify",
                 f"{ref}^{{commit}}",
-            ],
+            ),
             capture_output=True,
             text=True,
         )
@@ -62,7 +72,7 @@ def _resolve_default_base():
 
 
 
-def get_git_diff():
+def get_git_diff(repo_dir=None):
 
     base_sha = os.getenv(
         "GITHUB_BASE_SHA"
@@ -71,25 +81,25 @@ def get_git_diff():
 
     if base_sha:
 
-        cmd = [
-            "git",
+        cmd = _git_command(
+            repo_dir,
             "diff",
             base_sha,
             "HEAD"
-        ]
+        )
 
 
     else:
 
-        base_ref = _resolve_default_base()
+        base_ref = _resolve_default_base(repo_dir)
 
         merge_base = subprocess.run(
-            [
-                "git",
+            _git_command(
+                repo_dir,
                 "merge-base",
                 base_ref,
                 "HEAD",
-            ],
+            ),
             capture_output=True,
             text=True,
         )
@@ -111,11 +121,11 @@ def get_git_diff():
                 "between the default base and HEAD."
             )
 
-        cmd = [
-            "git",
+        cmd = _git_command(
+            repo_dir,
             "diff",
             merge_base_sha,
-        ]
+        )
 
 
 
