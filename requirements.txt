@@ -1,5 +1,6 @@
-openai
-python-dotenv
-pydantic
-pydantic-settings
-pyyaml
+# 下界为 2026-11-10 实测通过的最低版本；上界防止跨大版本破坏。
+openai>=3.46.0,<4
+python-dotenv>=1.2.4,<2
+pydantic>=2.14.3,<3
+pydantic-settings>=2.16.2,<3
+pyyaml>=6.0.3,<7
