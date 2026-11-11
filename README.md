@@ -61,6 +61,47 @@ review:
 
 ## GitHub Actions
 
+### Reusable Workflow（推荐用于其他仓库）
+
+工具仓库提供可复用工作流：审查 Job 只读并运行固定版本的审查器，发布 Job
+单独持有 PR 评论权限，只消费 Artifact，不检出或执行 PR 代码。策略文件
+`review.yaml` 从 PR base commit 读取，因此 PR 本身不能通过修改阈值放宽本次门禁。
+
+调用方在自己的 Workflow 中引用同一版本的 Reusable Workflow：
+
+```yaml
+name: AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  review:
+    uses: Zhangjinkai123/ai-code-reviewer/.github/workflows/reusable-review.yml@v1.1.0
+    with:
+      base-url: https://api.openai.com/v1
+      model: gpt-4o-mini
+    secrets:
+      api-key: ${{ secrets.CR_API_KEY }}
+```
+
+当前示例使用 `v1.1.0`。生产环境也可以将它固定为该版本对应的完整 commit SHA，
+避免 Tag 被移动。模型密钥只传给审查 Workflow；fork PR 默认拿不到调用方 Secret，
+审查会失败而不会被报告成通过。
+审查 Job 使用 `fetch-depth: 0`，以便三点 Diff 能找到共同祖先。
+
+### Composite Action（单 Job / 自定义编排）
+
+`action.yml` 仍可用于需要自行控制 Job、权限和报告处理的场景。调用方负责
+checkout 目标仓库、配置 `fetch-depth: 0`，并传入 API 参数；Composite Action
+本身不能隔离 Job 权限，因此生产 PR 评论建议使用上面的 Reusable Workflow。
+
 项目使用两个 Workflow：
 
 1. `AI Code Review` 在 PR `opened`、`synchronize`、`reopened` 时运行审查，上传 `ai-review-result` Artifact。

@@ -23,6 +23,13 @@ def load_workflow(filename):
     )
 
 
+def load_workflow_strings(filename):
+    return yaml.load(
+        (ROOT / ".github" / "workflows" / filename).read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+
+
 def prepare_report(main, directory, issues):
     """运行 CLI 的实际审查、定位、落盘和门禁，仅替换外部输入和模型服务。"""
     diff = (ROOT / "examples/yaml_regression_invalid.diff").read_text(encoding="utf-8")
@@ -62,6 +69,46 @@ def test_dual_workflow_contract():
     )
     with patch.dict(sys.modules, {"config": SimpleNamespace(settings=fake_settings)}):
         verify_dual_workflow_contract()
+
+
+def test_reusable_workflow_trust_boundary():
+    workflow = load_workflow_strings("reusable-review.yml")
+    assert workflow["on"]["workflow_call"]["secrets"]["api-key"]["required"] == "true"
+    assert workflow["permissions"] == {}
+
+    review = workflow["jobs"]["review"]
+    assert review["permissions"] == {"contents": "read"}
+    checkout = review["steps"][0]
+    assert checkout["with"]["ref"] == "${{ github.event.pull_request.head.sha }}"
+    assert checkout["with"]["persist-credentials"] == "false"
+    policy = review["steps"][1]
+    assert policy["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
+    assert "git -C target show" in policy["run"]
+    assert review["steps"][2]["uses"] == (
+        "Zhangjinkai123/ai-code-reviewer@"
+        "2515f9fd1af7034026f625564c44432830452490"
+    )
+    assert review["steps"][2]["with"]["repo-dir"] == "target"
+
+    publish = workflow["jobs"]["publish"]
+    assert publish["needs"] == "review"
+    assert publish["permissions"]["pull-requests"] == "write"
+    assert "actions" not in publish["permissions"]
+    publish_checkout = publish["steps"][0]
+    assert publish_checkout["with"]["repository"] == "Zhangjinkai123/ai-code-reviewer"
+    assert publish_checkout["with"]["ref"] == (
+        "2515f9fd1af7034026f625564c44432830452490"
+    )
+    assert publish_checkout["with"]["persist-credentials"] == "false"
+    publish_script = publish["steps"][-1]["run"]
+    assert "get_pr_head_sha" in publish_script
+    assert "current_sha != expected_sha" in publish_script
+    assert "stale comment skipped" in publish_script
+    assert not any(
+        step.get("uses", "").startswith("actions/checkout@")
+        and step.get("with", {}).get("repository") == "${{ github.repository }}"
+        for step in publish["steps"]
+    )
 
 
 def verify_dual_workflow_contract():
@@ -156,4 +203,5 @@ def verify_dual_workflow_contract():
 
 
 if __name__ == "__main__":
+    test_reusable_workflow_trust_boundary()
     test_dual_workflow_contract()

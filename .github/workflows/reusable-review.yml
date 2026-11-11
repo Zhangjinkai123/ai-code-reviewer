@@ -1,0 +1,157 @@
+name: Reusable AI Code Review
+
+on:
+  workflow_call:
+    inputs:
+      base-url:
+        description: OpenAI-compatible API base URL
+        required: true
+        type: string
+      model:
+        description: Model name
+        required: true
+        type: string
+    secrets:
+      api-key:
+        description: OpenAI-compatible API key
+        required: true
+
+permissions: {}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      report_available: ${{ steps.report.outputs.available }}
+    steps:
+      - name: Checkout pull request data
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: target
+
+      - name: Load trusted review policy
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          policy_path="${RUNNER_TEMP}/ai-review-policy.yaml"
+          if git -C target cat-file -e "${BASE_SHA}:review.yaml" 2>/dev/null; then
+            git -C target show "${BASE_SHA}:review.yaml" > "${policy_path}"
+          fi
+
+      - name: Run trusted reviewer
+        id: review
+        uses: Zhangjinkai123/ai-code-reviewer@2515f9fd1af7034026f625564c44432830452490
+        continue-on-error: true
+        with:
+          api-key: ${{ secrets.api-key }}
+          base-url: ${{ inputs.base-url }}
+          model: ${{ inputs.model }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          repo-dir: target
+          config-path: ${{ runner.temp }}/ai-review-policy.yaml
+          report-path: reports/review-report.json
+
+      - name: Check report availability
+        id: report
+        if: always()
+        shell: bash
+        run: |
+          if [ -f reports/review-report.json ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload review report
+        if: always() && steps.report.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-review-result
+          path: reports/review-report.json
+          if-no-files-found: error
+
+      - name: Preserve reviewer exit status
+        if: always()
+        shell: bash
+        env:
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+          REVIEW_EXIT_CODE: ${{ steps.review.outputs.exit-code }}
+        run: |
+          if [ "${REVIEW_OUTCOME}" = "failure" ]; then
+            if [[ "${REVIEW_EXIT_CODE}" =~ ^[0-9]+$ ]] && [ "${REVIEW_EXIT_CODE}" -ne 0 ]; then
+              exit "${REVIEW_EXIT_CODE}"
+            fi
+            exit 2
+          fi
+
+  publish:
+    needs: review
+    if: always() && needs.review.outputs.report_available == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout trusted reviewer
+        uses: actions/checkout@v4
+        with:
+          repository: Zhangjinkai123/ai-code-reviewer
+          ref: 2515f9fd1af7034026f625564c44432830452490
+          persist-credentials: false
+          path: trusted-reviewer
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install trusted reviewer dependencies
+        shell: bash
+        run: python -m pip install --disable-pip-version-check -r trusted-reviewer/requirements.txt
+
+      - name: Download review report
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-review-result
+          path: review-result
+
+      - name: Publish PR comment
+        working-directory: trusted-reviewer
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_RUN_ID: ${{ github.run_id }}
+        run: |
+          python -c "
+          import os
+          from reviewer.commenter import create_pr_comment
+          from reviewer.github import get_pr_head_sha
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          pr_number = int(os.environ['PR_NUMBER'])
+          token = os.environ['GITHUB_TOKEN']
+          expected_sha = os.environ['COMMIT_SHA']
+          current_sha = get_pr_head_sha(repo, pr_number, token)
+
+          if current_sha != expected_sha:
+              print('PR head changed during review; stale comment skipped.')
+              raise SystemExit(0)
+
+          create_pr_comment(
+              review_result_path='../review-result/review-report.json',
+              repo=repo,
+              pr_number=pr_number,
+              token=token,
+              commit_sha=expected_sha,
+              run_id=int(os.environ['REVIEW_RUN_ID']),
+          )
+          "
