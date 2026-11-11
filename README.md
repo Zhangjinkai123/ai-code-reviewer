@@ -83,7 +83,7 @@ permissions:
 
 jobs:
   review:
-    uses: Zhangjinkai123/ai-code-reviewer/.github/workflows/reusable-review.yml@v1.1.0
+    uses: Zhangjinkai123/ai-code-reviewer/.github/workflows/reusable-review.yml@54c1b8e43de314db00db7779dfe268a5a21e4eb1
     with:
       base-url: https://api.openai.com/v1
       model: gpt-4o-mini
@@ -91,10 +91,25 @@ jobs:
       api-key: ${{ secrets.CR_API_KEY }}
 ```
 
-当前示例使用 `v1.1.0`。生产环境也可以将它固定为该版本对应的完整 commit SHA，
-避免 Tag 被移动。模型密钥只传给审查 Workflow；fork PR 默认拿不到调用方 Secret，
-审查会失败而不会被报告成通过。
+示例固定到 `v1.1.0` 对应的完整 commit SHA，避免 Tag 被移动。模型密钥只传给
+审查 Workflow。fork PR 默认拿不到调用方 Secret；同仓库 PR 则可能使用仓库
+Secret，因此只应允许可信协作者创建可运行该 Workflow 的分支和 PR。
 审查 Job 使用 `fetch-depth: 0`，以便三点 Diff 能找到共同祖先。
+
+### 生产仓库设置
+
+在实际调用仓库的 Settings 中配置 `CR_API_KEY`，并将写权限限制给可信维护者。
+在 Branches / Rulesets 中保护默认分支：要求 Pull Request、要求
+`AI Code Review / review / review (pull_request)` 检查通过、禁止直接推送和强制推送。
+如果有多位维护者，要求至少一位可信维护者批准，并重点审查 `.github/workflows/**`
+的改动；单人维护时可暂不要求审批，但应在合并前人工检查 Workflow 变更。
+首次启用时先观察检查结果，确认稳定后再把它设为必需检查。
+
+当前源码中的 GitHub Actions 引用已固定到完整 commit SHA；上述 `v1.1.0`
+示例仍使用旧版审查器，不包含尚未发布的 Action 依赖加固。发布加固版本需分两步：
+先发布包含加固后 `action.yml` 的可信提交，再将可复用 Workflow 中审查器和
+发布器的引用同时更新到该提交，验证后发布新版本并更新接入示例。
+更新依赖时应核对官方仓库的发布记录和 SHA，并运行 `python test_workflow.py`。
 
 ### Composite Action（单 Job / 自定义编排）
 

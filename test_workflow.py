@@ -4,8 +4,10 @@ import json
 import os
 from contextlib import redirect_stdout
 from pathlib import Path
+import re
 import shlex
 import shutil
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -28,6 +30,38 @@ def load_workflow_strings(filename):
         (ROOT / ".github" / "workflows" / filename).read_text(encoding="utf-8"),
         Loader=yaml.BaseLoader,
     )
+
+
+def collect_action_references(value):
+    if isinstance(value, dict):
+        references = []
+        for key, child in value.items():
+            if key == "uses" and isinstance(child, str):
+                references.append(child)
+            else:
+                references.extend(collect_action_references(child))
+        return references
+    if isinstance(value, list):
+        return [
+            reference
+            for child in value
+            for reference in collect_action_references(child)
+        ]
+    return []
+
+
+def test_actions_are_pinned_to_full_commit_sha():
+    files = [ROOT / "action.yml", *(ROOT / ".github" / "workflows").glob("*.yml")]
+    references = []
+    for path in files:
+        data = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        references.extend(collect_action_references(data))
+
+    assert references
+    assert all(
+        re.search(r"@[0-9a-f]{40}$", reference)
+        for reference in references
+    ), references
 
 
 def prepare_report(main, directory, issues):
@@ -84,11 +118,18 @@ def test_reusable_workflow_trust_boundary():
     policy = review["steps"][1]
     assert policy["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
     assert "git -C target show" in policy["run"]
-    assert review["steps"][2]["uses"] == (
+    reviewer = next(step for step in review["steps"] if step.get("id") == "review")
+    assert reviewer["uses"] == (
         "Zhangjinkai123/ai-code-reviewer@"
         "2515f9fd1af7034026f625564c44432830452490"
     )
-    assert review["steps"][2]["with"]["repo-dir"] == "target"
+    assert reviewer["with"]["repo-dir"] == "target"
+    cleanup = next(step for step in review["steps"] if step["name"] == "Remove previous review report")
+    assert review["steps"].index(cleanup) < review["steps"].index(reviewer)
+    assert cleanup["run"] == "rm -f reports/review-report.json"
+    preserve = next(step for step in review["steps"] if step["name"] == "Preserve reviewer exit status")
+    assert preserve["if"] == "always()"
+    assert '"${REVIEW_OUTCOME}" != "success"' in preserve["run"]
 
     publish = workflow["jobs"]["publish"]
     assert publish["needs"] == "review"
@@ -99,6 +140,7 @@ def test_reusable_workflow_trust_boundary():
     assert publish_checkout["with"]["ref"] == (
         "2515f9fd1af7034026f625564c44432830452490"
     )
+    assert reviewer["uses"].split("@")[1] == publish_checkout["with"]["ref"]
     assert publish_checkout["with"]["persist-credentials"] == "false"
     publish_script = publish["steps"][-1]["run"]
     assert "get_pr_head_sha" in publish_script
@@ -109,6 +151,38 @@ def test_reusable_workflow_trust_boundary():
         and step.get("with", {}).get("repository") == "${{ github.repository }}"
         for step in publish["steps"]
     )
+
+
+def test_reusable_workflow_failure_status():
+    workflow = load_workflow_strings("reusable-review.yml")
+    steps = workflow["jobs"]["review"]["steps"]
+    script = next(
+        step["run"] for step in steps
+        if step["name"] == "Preserve reviewer exit status"
+    )
+    bash = shutil.which("bash")
+    if not bash and sys.platform == "win32":
+        git = shutil.which("git")
+        if git:
+            candidate = Path(git).resolve().parent.parent / "bin" / "bash.exe"
+            if candidate.is_file():
+                bash = str(candidate)
+    if not bash:
+        print("Skipped shell status test: bash not found.")
+        return
+
+    for outcome, code, expected in [
+        ("success", "0", 0),
+        ("failure", "1", 1),
+        ("failure", "2", 2),
+        ("failure", "", 2),
+        ("failure", "invalid", 2),
+        ("skipped", "", 2),
+    ]:
+        env = os.environ.copy()
+        env.update(REVIEW_OUTCOME=outcome, REVIEW_EXIT_CODE=code)
+        completed = subprocess.run([bash, "-c", script], env=env, check=False)
+        assert completed.returncode == expected, (outcome, code, completed.returncode)
 
 
 def verify_dual_workflow_contract():
@@ -203,5 +277,7 @@ def verify_dual_workflow_contract():
 
 
 if __name__ == "__main__":
+    test_actions_are_pinned_to_full_commit_sha()
     test_reusable_workflow_trust_boundary()
+    test_reusable_workflow_failure_status()
     test_dual_workflow_contract()
