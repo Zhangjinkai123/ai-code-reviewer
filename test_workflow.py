@@ -121,7 +121,7 @@ def test_reusable_workflow_trust_boundary():
     reviewer = next(step for step in review["steps"] if step.get("id") == "review")
     assert reviewer["uses"] == (
         "Zhangjinkai123/ai-code-reviewer@"
-        "2515f9fd1af7034026f625564c44432830452490"
+        "0e4257f42df81960a79c0b38f54bd5ce033e5da2"
     )
     assert reviewer["with"]["repo-dir"] == "target"
     cleanup = next(step for step in review["steps"] if step["name"] == "Remove previous review report")
@@ -138,7 +138,7 @@ def test_reusable_workflow_trust_boundary():
     publish_checkout = publish["steps"][0]
     assert publish_checkout["with"]["repository"] == "Zhangjinkai123/ai-code-reviewer"
     assert publish_checkout["with"]["ref"] == (
-        "2515f9fd1af7034026f625564c44432830452490"
+        "0e4257f42df81960a79c0b38f54bd5ce033e5da2"
     )
     assert reviewer["uses"].split("@")[1] == publish_checkout["with"]["ref"]
     assert publish_checkout["with"]["persist-credentials"] == "false"
