@@ -50,7 +50,7 @@ jobs:
 
       - name: Run trusted reviewer
         id: review
-        uses: Zhangjinkai123/ai-code-reviewer@2515f9fd1af7034026f625564c44432830452490
+        uses: Zhangjinkai123/ai-code-reviewer@0e4257f42df81960a79c0b38f54bd5ce033e5da2
         continue-on-error: true
         with:
           api-key: ${{ secrets.api-key }}
@@ -107,7 +107,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: Zhangjinkai123/ai-code-reviewer
-          ref: 2515f9fd1af7034026f625564c44432830452490
+          ref: 0e4257f42df81960a79c0b38f54bd5ce033e5da2
           persist-credentials: false
           path: trusted-reviewer
 
