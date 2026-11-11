@@ -81,11 +81,12 @@ def get_git_diff(repo_dir=None):
 
     if base_sha:
 
+        # 三点 diff：比较 base 与 HEAD 的共同祖先，只包含 HEAD 侧的真实改动。
+        # 两点 diff 会把 base 分支上的新提交显示成反向改动，导致误报。
         cmd = _git_command(
             repo_dir,
             "diff",
-            base_sha,
-            "HEAD"
+            f"{base_sha}...HEAD"
         )
 
 

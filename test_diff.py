@@ -59,8 +59,9 @@ def test_actions_diff_uses_base_sha_and_head():
         result = get_git_diff()
 
     assert result == "actions diff"
+    # 必须用三点 diff：两点会把 base 分支的新提交显示成反向改动。
     mock_run.assert_called_once_with(
-        ["git", "diff", "base-sha", "HEAD"],
+        ["git", "diff", "base-sha...HEAD"],
         capture_output=True,
         text=True,
     )
@@ -149,11 +150,75 @@ def test_repo_dir_uses_git_dash_c():
     print("[PASS] test_repo_dir_uses_git_dash_c")
 
 
+def test_base_ahead_does_not_create_reverse_diff():
+    """
+    base 分支在 PR 分叉后又有新提交时，不能把对方的新内容当成 PR 改动。
+
+    这是两点 diff 的典型故障：base 上的新文件会显示成 PR 删除它，
+    新增内容会显示成删除，导致虚假高危问题。
+    """
+    original_directory = os.getcwd()
+
+    with tempfile.TemporaryDirectory() as directory:
+        def git(*args):
+            return subprocess.run(
+                ["git", "-C", directory, *args],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+
+        git("init", "-b", "master")
+        git("config", "user.name", "Diff Test")
+        git("config", "user.email", "diff-test@example.invalid")
+
+        app = Path(directory) / "app.py"
+        app.write_text("a\n", encoding="utf-8")
+        git("add", "app.py")
+        git("commit", "-m", "base")
+
+        # PR 分支：只追加一行
+        git("checkout", "-b", "feature")
+        app.write_text("a\nPR-CHANGE\n", encoding="utf-8")
+        git("add", "app.py")
+        git("commit", "-m", "pr change")
+
+        # base 分支继续前进：改动同一文件，并新增一个文件
+        git("checkout", "master")
+        app.write_text("a\nMASTER-ONLY\n", encoding="utf-8")
+        (Path(directory) / "unrelated.md").write_text(
+            "someone else\n", encoding="utf-8"
+        )
+        git("add", "app.py", "unrelated.md")
+        git("commit", "-m", "master moved on")
+
+        base_sha = git("rev-parse", "master")
+
+        git("checkout", "feature")
+
+        try:
+            os.chdir(directory)
+            with patch.dict(os.environ, {"GITHUB_BASE_SHA": base_sha}):
+                diff = get_git_diff()
+        finally:
+            os.chdir(original_directory)
+
+        # 只应包含 PR 自己新增的那一行
+        assert "+PR-CHANGE" in diff
+
+        # 不得出现反向改动或 base 上的无关文件
+        assert "MASTER-ONLY" not in diff
+        assert "unrelated.md" not in diff
+
+    print("[PASS] test_base_ahead_does_not_create_reverse_diff")
+
+
 def main():
     test_local_diff_includes_working_tree_changes()
     test_actions_diff_uses_base_sha_and_head()
     test_diverged_base_excludes_base_only_changes()
     test_repo_dir_uses_git_dash_c()
+    test_base_ahead_does_not_create_reverse_diff()
     print()
     print("All Git diff tests passed.")
 
